@@ -1,5 +1,6 @@
 package ru.netology.statsview.ui
 
+import android.animation.ValueAnimator
 import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Paint
@@ -8,8 +9,7 @@ import android.graphics.PointF
 import android.graphics.RectF
 import android.util.AttributeSet
 import android.view.View
-import androidx.compose.ui.graphics.vector.Path
-import androidx.compose.ui.unit.dp
+import android.view.animation.LinearInterpolator
 import androidx.core.content.withStyledAttributes
 import ru.netology.statsview.R
 import ru.netology.statsview.utils.AndroidUtils
@@ -25,11 +25,14 @@ class StatsView @JvmOverloads constructor(
     private var radius = 0F
     private var center = PointF(0F, 0F)
     private var oval = RectF(0F, 0F, 0F, 0F)
-    private var microOval = RectF(0F, 0F, 0F, 0F)
 
     private var lineWidth = AndroidUtils.dp(context, 5F).toFloat()
     private var fontSize = AndroidUtils.dp(context, 40F).toFloat()
     private var colors = emptyList<Int>()
+
+    private var progress = 0F
+    private var valueAnimator: ValueAnimator? = null
+    private var rotationProgress = 0F
 
 
     init {
@@ -51,12 +54,20 @@ class StatsView @JvmOverloads constructor(
         style = Paint.Style.FILL
         textAlign = Paint.Align.CENTER
         textSize = fontSize
+
+    }
+    private val paintPoint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.FILL
+        strokeWidth = lineWidth
+        strokeCap = Cap.ROUND
+
+
     }
 
     var data: List<Float> = emptyList()
         set(value) {
             field = value
-            invalidate()
+            update()
         }
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
@@ -66,34 +77,31 @@ class StatsView @JvmOverloads constructor(
             center.x - radius, center.y - radius,
             center.x + radius, center.y + radius,
         )
-        microOval =RectF(
-            center.x - radius, center.y - radius,
-            center.x + radius, center.y + radius,
-        )
+
     }
 
     override fun onDraw(canvas: Canvas) {
         if (data.isEmpty()) {
             return
         }
+        canvas.save()
+        canvas.rotate(rotationProgress, center.x, center.y)
         var startFrom = -90F
         for ((index, datum) in AndroidUtils.percentage(data).withIndex()) {
             val angle = 360F * datum
             paint.color = colors.getOrNull(index) ?: randomColor()
-            canvas.drawArc(oval, startFrom, angle, false, paint)
+            canvas.drawArc(oval, startFrom + rotationProgress, angle * progress, false, paint)
             startFrom += angle
 
         }
-        var microStart = -90F
-        for ((index, datum) in AndroidUtils.percentage(data).withIndex()) {
-            val angle = 360F * datum
-            paint.color = colors.getOrNull(index) ?: randomColor()
+        val startX = center.x
+        val startY = center.y - radius
+        paintPoint.color = colors.getOrNull(0) ?: randomColor()
+        canvas.drawPoint(startX, startY, paintPoint)
 
-            val angleMicro = angle/2
-            canvas.drawArc(microOval,microStart,angleMicro,false,paint)
-            microStart +=angle
 
-        }
+        canvas.restore()
+
         canvas.drawText(
             "%.2f%%".format(AndroidUtils.percentage(data).sum() * 100),
             center.x,
@@ -103,4 +111,29 @@ class StatsView @JvmOverloads constructor(
     }
 
     private fun randomColor() = Random.nextInt(0xFF000000.toInt(), 0xFFFFFFFF.toInt())
+
+
+    private fun update() {
+        valueAnimator?.let {
+            it.removeAllUpdateListeners()
+            it.cancel()
+        }
+        progress = 0F
+        rotationProgress = 0F
+
+        valueAnimator = ValueAnimator.ofFloat(0F, 1F).apply {
+            addUpdateListener { anim ->
+                progress = anim.animatedValue as Float
+                rotationProgress = progress * 360F
+                invalidate()
+            }
+            duration = 2000
+            interpolator = LinearInterpolator()
+        }.also {
+            it.start()
+        }
+
+    }
+
+
 }

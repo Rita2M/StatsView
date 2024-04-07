@@ -10,7 +10,7 @@ object AndroidUtils {
         ceil(context.resources.displayMetrics.density * dp).toInt()
 
     fun percentage(list: List<Float>): List<Float> {
-        val y = (list.sum())  //2000
-        return list.map { it / y } //0,25
+        val sum = (list.sum())  //2000
+        return list.map { it / sum } //0,25
     }
 }
